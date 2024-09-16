@@ -145,44 +145,14 @@ class LSTMSinglePointProcess(nn.Module):
                         res[b, s, 0] = dt[b]
             return res
 
-
-class LSTMMultiplePointProcesses(nn.Module):
-    """
-        Multiple Point Processes Model, Point Processes are distinguished with different initial hidden states
-    """
-
+class LSTMMultiplePointProcesses(LSTMSinglePointProcess):
     def __init__(self, input_size, hidden_size, num_layers, num_classes, num_clusters, n_steps,
                  batch_first=True, dropout=0, bidirectional=False):
-        """
-           input:
-                  input_size - int, input size of the data for LSTM
-                  hidden_size - int, LSTM hidden state size
-                  num_layers - int, number of LSTM layers
-                  num_classes - int, number of types of events that can occur
-                  num_clusters - int, number of different point processes
-                  n_steps - int, sequence length (used for batch normalization)
-                  batch_first - bool, whether the batch should go first in LSTM
-                  dropout - float (>=0,<1), dropout probability for all LSTM layers but the last one
-                  bidirectional - bool, bidirectional LSTM or not
-
-           model parameters:
-                  hidden_size - int, LSTM hidden state size
-                  lstm - torch.nn.Module, LSTM model
-                  bn - torch.nn.Module, Batch Normalization
-                  hidden0 - torch.nn.parameter.Parameter, initial hidden states, size[0] = num_clusters
-                  cell0 - torch.nn.parameter.Parameter, initial cell states, size[0] = num_clusters
-                  W - torch.nn.parameter.Parameter, weighs for mapping hidden state to lambda
-                  f_{k} - torch.nn.Module, Scaled Softplus, k - number of point process, 0<=k<num_clusters
-                  num_classes - int, number of types of events that can occur
-                  num_clusters - int, number of different point processes
-                  bidir - bool, bidirectional LSTM or not
-        """
-        super().__init__()
+        LSTMSinglePointProcess.__init__(self, input_size, hidden_size, num_layers, num_classes, num_clusters, n_steps,
+                 batch_first=True, dropout=0, bidirectional=False)
         self.hidden_size = hidden_size
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers,
-                            batch_first=batch_first, dropout=dropout,
-                            bidirectional=bidirectional)
         self.bn = nn.BatchNorm1d(n_steps)
+        
         if bidirectional:
             self.hidden0 = nn.Parameter(self.init_weigh(num_clusters, num_layers * 2, hidden_size))
             self.cell0 = nn.Parameter(self.init_weigh(num_clusters, num_layers * 2, hidden_size))
@@ -191,11 +161,11 @@ class LSTMMultiplePointProcesses(nn.Module):
             self.hidden0 = nn.Parameter(self.init_weigh(num_clusters, num_layers, hidden_size))
             self.cell0 = nn.Parameter(self.init_weigh(num_clusters, num_layers, hidden_size))
             self.W = nn.Parameter(self.init_weigh(hidden_size, num_classes))
+        
         for k in range(num_clusters):
             setattr(self, 'f_{}'.format(k), ScaledSoftplus())
-        self.num_classes = num_classes
+        
         self.num_clusters = num_clusters
-        self.bidir = bidirectional
 
     def init_weigh(self, *args):
         """
